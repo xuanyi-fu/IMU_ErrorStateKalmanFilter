@@ -4,7 +4,6 @@ classdef Measurement
         acc
         av %angular_velocity
         mag
-        
     end
     
     methods

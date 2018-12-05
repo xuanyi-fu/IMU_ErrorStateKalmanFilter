@@ -1,4 +1,12 @@
-% filter = IMU_ErrorStateKalmanFilter('processed_data.mat');
-q1 = Quaternion([1;-1;-1.1;1])
-q2 = Quaternion([2;2;2;2])
-qans = q2*inv(q2)
+gyroVar = 1e-4 * ones(3,1);
+gyroBias = 1e-4 * ones(3,1);
+gyroBiasVar = 1e-4 * ones(3,1);
+gyroBiasVarInit = 1e-4 * ones(3,1);
+accVar = 1e-4 * ones(3,1);
+MagVar = 1e-4 * ones(3,1);
+attVarInit =1e-4 * ones(3,1);
+
+noise = NoiseParameter(gyroVar,gyroBias,gyroBiasVar,gyroBiasVarInit,...
+                accVar,MagVar,attVarInit);
+filter = IMU_ErrorStateKalmanFilter('processed_data.mat',noise);
+
