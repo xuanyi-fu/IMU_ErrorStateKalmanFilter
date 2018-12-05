@@ -6,9 +6,17 @@ classdef ErrorState
     end
     
     methods
-        function obj = ErrorState(delta_theta,delta_omega_b)
-            obj.delta_theta = delta_theta;
-            obj.delta_omega_b = delta_omega_b;
+        function obj = ErrorState(varargin)
+            if nargin == 0
+            obj.delta_theta = [0;0;0];
+            obj.delta_omega_b = [0;0;0];
+            %Array Constructor
+            elseif nargin == 1
+                obj(varargin{1},1)=obj;
+            else
+                obj.delta_theta = varargin{1};
+                obj.delta_omega_b = varargin{2};        
+            end
         end
     end
 end
