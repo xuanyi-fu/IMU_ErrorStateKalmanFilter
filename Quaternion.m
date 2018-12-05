@@ -16,12 +16,21 @@ classdef Quaternion
             elseif nargin == 1 && isvector(varargin{1}) && size(varargin{1},1)==4
                 %build quaternion from a [4x1] Vector
                 obj.q = varargin{1};
-            elseif nargin == 1 && isa(varargin,'Quaternion')
-                obj.q = varargin{1}.q;
+            elseif nargin == 1 && isa(varargin{1},'Quaternion')
+                obj = Quaternion(varargin{1}.q);
+            %Build a Quaternion from the rotation angles and rotation axis.    
+            elseif nargin == 2 && isvector(varargin{2}) && size(varargin{2},1)==3 ...
+                    && isscalar(varargin{1})
+                if(abs(norm(varargin{2})-1)>1e-8)
+                    error ('Quaternion Constructor Error, Rotation Axis Norm Not Equal to 1')
+                end
+                obj = Quaternion([cos(varargin{1}/2);sin(varargin{1}/2)*varargin{2}]);
             elseif nargin == 3
                 %build quaternion from XYZ Euler Angles
-                %NOT BUILD YET
-                obj.q = [0;0;0;0];
+                qx = Quaternion(varargin{1},[1;0;0]);
+                qy = Quaternion(varargin{2},[0;1;0]);
+                qz = Quaternion(varargin{3},[0;0;1]);
+                obj = qz*(qy*qx);
             else
                 error ('invalid argument for Quaternion constructor')
             end

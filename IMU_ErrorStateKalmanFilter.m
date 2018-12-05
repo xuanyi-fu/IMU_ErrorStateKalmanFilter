@@ -14,9 +14,12 @@ classdef IMU_ErrorStateKalmanFilter < handle
         
     end
     methods
+        %Constructor
         function obj = IMU_ErrorStateKalmanFilter(dataName)
             readInput(obj,dataName);
         end
+        
+        %Read input from data
         function readInput(obj,dataName)
             data = importdata(dataName);
             obj.data_length = size(data,1);
@@ -32,10 +35,12 @@ classdef IMU_ErrorStateKalmanFilter < handle
             end
             %set current state to be one
             obj.currentState = 1;
-        end      
-%         function initializeStates(obj)
-%             
-%         end
+        end  
+        
+        %Compute the initial state
+        function initializeStates(obj)
+            p
+        end
     end
 end
 
