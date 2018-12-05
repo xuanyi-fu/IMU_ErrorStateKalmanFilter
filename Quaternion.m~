@@ -33,29 +33,7 @@ classdef Quaternion
             q = Quaternion(obj.q/norm(obj.q));
         end
         
-        function matrix_ql = leftProductMatrix(obj)
-            matrix_ql = zeros(4,4);
-            matrix_ql(2:4,2:4)=v2s(obj.q(2:4));
-            matrix_ql(1,2:4)=-obj.q(2:4).';
-            matrix_ql(2:4,1)=obj.q(2:4);
-            matrix_ql = matrix_ql + obj.q(1)*eye(4);
-        end
-        
-        function matrix_qr = rightProductMatrix(obj)
-            matrix_qr = zeros(4,4);
-            matrix_qr(2:4,2:4)=-v2s(obj.q(2:4));
-            matrix_qr(1,2:4)=-obj.q(2:4).';
-            matrix_qr(2:4,1)=obj.q(2:4);
-            matrix_qr= matrix_qr + obj.q(1)*eye(4);
-        end
-        
-        function n = norm(obj)
-            n = sqrt(obj.q.'*obj.q);
-        end
-        
-        function qinv = inv(obj)
-            qinv = (1/norm(obj))^2*obj';
-        end
+        function matrix_ql = leftProductMatrix 
         
         %% Operators Overloading
         

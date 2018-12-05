@@ -1,4 +1,4 @@
-classdef IMU_ErrorStateKalmanFilter
+classdef IMU_ErrorStateKalmanFilter < handle
     
     properties  
         
@@ -15,6 +15,9 @@ classdef IMU_ErrorStateKalmanFilter
     end
     methods
         function obj = IMU_ErrorStateKalmanFilter(dataName)
+            readInput(obj,dataName);
+        end
+        function readInput(obj,dataName)
             data = importdata(dataName);
             obj.data_length = size(data,1);
             %initialize arrays of states and measurements
@@ -29,7 +32,10 @@ classdef IMU_ErrorStateKalmanFilter
             end
             %set current state to be one
             obj.currentState = 1;
-        end
+        end      
+%         function initializeStates(obj)
+%             
+%         end
     end
 end
 
