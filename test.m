@@ -5,8 +5,8 @@ gyroBiasVarInit = 1e-4 * ones(3,1);
 accVar = 1e-4 * ones(3,1);
 MagVar = 1e-4 * ones(3,1);
 attVarInit =1e-4 * ones(3,1);
-
+magDec = 8.3;
 noise = NoiseParameter(gyroVar,gyroBias,gyroBiasVar,gyroBiasVarInit,...
-                accVar,MagVar,attVarInit);
-filter = IMU_ErrorStateKalmanFilter('processed_data.mat',noise);
+                accVar,MagVar,attVarInit,magDec);
+filter = IMU_ErrorStateKalmanFilter('NAV_1.mat',noise);
 

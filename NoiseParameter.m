@@ -7,19 +7,21 @@ classdef NoiseParameter
         omega_variance_init %initial variance of bias of the gyrometer
         attitude_variance_init %initial variance of attitude
         P_init % initla P matrix of error-state
+        mag_declination
     end
     
     methods
         function obj = NoiseParameter(gyroVar,gyroBias,gyroBiasVar,gyroBiasVarInit,...
-                accVar,MagVar,attVarInit)
-        if nargin == 7
+                accVar,MagVar,attVarInit,magDec)
+        if nargin == 8
             if isvector(gyroVar) && size(gyroVar,1) == 3 &&...
                isvector(gyroBiasVar) && size(gyroBiasVar,1) == 3 &&...
                isvector(accVar) && size(accVar,1) == 3 &&...
                isvector(MagVar) && size(MagVar,1) == 3 &&...
                isvector(gyroBias) && size(gyroBias,1) == 3&&...
                isvector(gyroBiasVarInit) && size(gyroBiasVarInit,1) == 3&&...
-               isvector(attVarInit) && size(attVarInit,1) == 3
+               isvector(attVarInit) && size(attVarInit,1) == 3&&...
+               isscalar(magDec)
                
             obj.Q = diag([gyroVar.',gyroBiasVar.']);
             obj.V = diag([accVar.',MagVar.']);
@@ -27,6 +29,7 @@ classdef NoiseParameter
             obj.omega_variance_init = gyroBiasVarInit;
             obj.attitude_variance_init = attVarInit;
             obj.P_init = diag([obj.attitude_variance_init.',obj.omega_variance_init.']);
+            obj.mag_declination = magDec;
             else
                 error('All Variance&Bias Params Must be [3x1] Vectors')
             end

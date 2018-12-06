@@ -25,6 +25,10 @@ classdef Quaternion
                     error ('Quaternion Constructor Error, Rotation Axis Norm Not Equal to 1')
                 end
                 obj = Quaternion([cos(varargin{1}/2);sin(varargin{1}/2)*varargin{2}]);
+            %Build a Quaternion from the lie algebra so(3) ([3x1] Vector) Jose Page 47
+            elseif nargin == 1 && isvector(varargin{1}) && size(varargin{1},1)==3
+                v = varargin{1};
+                obj = Quaternion([cos(norm(v)/2);v/norm(v)*sin(norm(v)/2)]);
             elseif nargin == 1 && isvector(varargin{1}) && size(varargin{1},1)==3
                 %build quaternion from XYZ Euler Angles
                 qx = Quaternion(varargin{1}(1),[1;0;0]);
