@@ -20,6 +20,7 @@ classdef IMU_ErrorStateKalmanFilter < handle
             readInput(obj,dataName);
             obj.noiseParam = noiseParameters;
             initializeStates(obj);
+            
         end
         
         %Read input from data
@@ -36,7 +37,7 @@ classdef IMU_ErrorStateKalmanFilter < handle
                 obj.measurements(i).av  = data(i,27:29); 
                 obj.measurements(i).mag = data(i,15:17);
                 %NOTICE THIS IS HARD-CODE NOW, BUT WILL UPDATE LATER
-                obj.measurement(i).dt = 0.02;
+                obj.measurements(i).dt = 0.02;
             end
             %set current state to be one
             obj.currentState = 1;
@@ -53,9 +54,10 @@ classdef IMU_ErrorStateKalmanFilter < handle
             obj.errorStates(1).delta_theta   = [0;0;0];
             obj.errorStates(1).delta_omega_b = [0;0;0];
         end
+        
         function initializeStates(obj)
             initializeNominalStates(obj);
-            initializeErrorStates(obj)
+            initializeErrorStates(obj);
         end
     
         function eulerAngles = measurement2EulerAngles(obj,measurement)
@@ -73,20 +75,18 @@ classdef IMU_ErrorStateKalmanFilter < handle
             quaternion = Quaternion(obj.measurement2EulerAngles(measurement));
         end
         
-        %State propagation
+        %State prediction
         function nominalStatePrediction(obj)
-            obj.nominalStates(obj.currentState)
-            obj.nominalStates(obj.currentState+1)
 
-            omega1 = obj.measurements(obj.currentState).av;
-            omega2 = obj.measurements(obj.currentState+1).av;
-            dt = obj.measurements(obj.currentState).dt;
-            qnow = obj.nominalStates(obj.currentState).attitude;
+            omega1 = obj.measurements(obj.currentState).av;%current state omega
+            omega2 = obj.measurements(obj.currentState+1).av;%next state omega
+            dt = obj.measurements(obj.currentState).dt;%current state delta time
+            qnow = obj.nominalStates(obj.currentState).attitude;%ERROR TO BE CORRRECTED
             
             obj.nominalStates(obj.currentState+1).attitude = Integeration('zerothOrder_mid',dt,qnow,omega1,omega2);
             obj.nominalStates(obj.currentState+1).omega_b=obj.nominalStates(obj.currentState+1).omgea_b; 
-        
         end
+        
         %Integration Methods
         function q2 = Integeration(method,dt,q,omega1,varargin)
             if(strcmp(method,'zerothOrder_forward') && nargin == 3)
