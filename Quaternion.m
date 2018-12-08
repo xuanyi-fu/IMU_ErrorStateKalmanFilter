@@ -29,7 +29,7 @@ classdef Quaternion
             elseif nargin == 1 && isvector(varargin{1}) && size(varargin{1},1)==3
                 v = varargin{1};
                 obj = Quaternion([cos(norm(v)/2);v/norm(v)*sin(norm(v)/2)]);
-            elseif nargin == 1 && isvector(varargin{1}) && size(varargin{1},1)==3
+            elseif nargin == 2 && isvector(varargin{1}) && size(varargin{1},1)==3 && strcmp(varargin{2},'euler2Quaternion')
                 %build quaternion from XYZ Euler Angles
                 qx = Quaternion(varargin{1}(1),[1;0;0]);
                 qy = Quaternion(varargin{1}(2),[0;1;0]);
@@ -45,7 +45,7 @@ classdef Quaternion
         function q = normalize(obj)
             q = Quaternion(obj.q/norm(obj.q));
         end
-        
+        %left product Matrix
         function matrix_ql = leftProductMatrix(obj)
             matrix_ql = zeros(4,4);
             matrix_ql(2:4,2:4)=v2s(obj.q(2:4));
@@ -53,7 +53,7 @@ classdef Quaternion
             matrix_ql(2:4,1)=obj.q(2:4);
             matrix_ql = matrix_ql + obj.q(1)*eye(4);
         end
-        
+        %right product Matrix
         function matrix_qr = rightProductMatrix(obj)
             matrix_qr = zeros(4,4);
             matrix_qr(2:4,2:4)=-v2s(obj.q(2:4));
@@ -61,13 +61,25 @@ classdef Quaternion
             matrix_qr(2:4,1)=obj.q(2:4);
             matrix_qr= matrix_qr + obj.q(1)*eye(4);
         end
-        
+        %norm
         function n = norm(obj)
             n = sqrt(obj.q.'*obj.q);
         end
-        
+        %inverse
         function qinv = inv(obj)
             qinv = (1/norm(obj))^2*obj';
+        end
+        %compute corresponding XYZ Euler angles
+        function eulerAngles = toEulerAngles(obj)
+            qvector = obj.q;
+            rad2deg=180/pi;
+            T=[ 1 - 2 * (qvector(4) *qvector(4) + qvector(3) * qvector(3))  2 * (qvector(2) * qvector(3) +qvector(1) * qvector(4))         2 * (qvector(2) * qvector(4)-qvector(1) * qvector(3));
+                2 * (qvector(2) * qvector(3)-qvector(1) * qvector(4))       1 - 2 * (qvector(4) *qvector(4) + qvector(2) * qvector(2))     2 * (qvector(3) * qvector(4)+qvector(1) * qvector(2));
+                2 * (qvector(2) * qvector(4) +qvector(1) * qvector(3))      2 * (qvector(3) * qvector(4)-qvector(1) * qvector(2))          1 - 2 * (qvector(2) *qvector(2) + qvector(3) * qvector(3))];%cnb
+            roll  = atan2(T(2,3),T(3,3))*rad2deg;
+            pitch = asin(-T(1,3))*rad2deg;
+            yaw   = atan2(T(1,2),T(1,1))*rad2deg;
+            eulerAngles = [roll;pitch;yaw];
         end
         
         %% Operators Overloading
