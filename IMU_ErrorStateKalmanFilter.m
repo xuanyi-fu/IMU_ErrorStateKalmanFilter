@@ -11,6 +11,10 @@ classdef IMU_ErrorStateKalmanFilter < handle
         currentState
         referenceStates    
     end
+    
+    properties(Constant)
+        RAD2DEG = 180/pi;
+    end
     methods
         %% Constructor & Main Loop
  
@@ -36,19 +40,22 @@ classdef IMU_ErrorStateKalmanFilter < handle
         %% Import Data
         function readInput(obj,dataName)
             data            = importdata(dataName);
-            data            = data(1:10000,:);
             obj.data_length = size(data,1);
             %initialize arrays of states and measurements
             obj.nominalStates = NominalState(obj.data_length);
             obj.errorStates   = ErrorState(obj.data_length);
             obj.measurements  = Measurement(obj.data_length);
-            obj.referenceStates = Quaternion(obj.data_length);
+            %obj.referenceStates = Quaternion(obj.data_length);
+            obj.referenceStates = zeros(obj.data_length,3);
             %build measurements with inputdata
             for i = 1:obj.data_length
                 obj.measurements(i).acc = data(i,9:11).';
                 obj.measurements(i).av  = data(i,27:29).'; 
                 obj.measurements(i).mag = data(i,15:17).';
-                obj.referenceStates(i) = Quaternion(data(i,30:32).','euler2Quaternion');
+                %obj.referenceStates(i) = Quaternion(data(i,30:32).','euler2Quaternion');
+                obj.referenceStates(i,1)=data(i,30)*obj.RAD2DEG;
+                obj.referenceStates(i,2)=data(i,31)*obj.RAD2DEG;
+                obj.referenceStates(i,3)=data(i,32)*obj.RAD2DEG;
                 %NOTICE THIS IS HARD-CODE NOW, BUT WILL UPDATE LATER
                 obj.measurements(i).dt = 0.02;
             end
@@ -255,37 +262,45 @@ classdef IMU_ErrorStateKalmanFilter < handle
             %obj.errorStates(obj.currentState+1).P = obj.errorStates(obj.currentState+1).P
          end
          % Plot figure
-%          function plotEulerAngleErrors(obj)
-%              eulerAngles = zeros(3,obj.data_length - 1);
-%              for i = 1:obj.data_length-1
-%                  eulerAngles(:,i)=obj.nominalStates(i).attitude.toEulerAngles();
-%              end             
-%              figure('Name','IMU Error State Kalman Filter For Attitude Estimation')
-%              subplot(1,3,1)
-%              plot(eulerAngles(1,:))
-%              hold on
-%              plot(obj.referenceStates(:,1))
-%              title('Roll')
-%              subplot(1,3,2)
-%              plot(eulerAngles(2,:))
-%              hold on
-%              plot(obj.referenceStates(:,2))
-%              title('Pitch')
-%              subplot(1,3,3)
-%              plot(eulerAngles(3,:))
-%              hold on
-%              plot(obj.referenceStates(:,3))
-%              title('Yaw')    
-%          end
-        function plotNormErrors(obj)
-            errors = zeros(obj.data_length - 1);
-            for i = 1:obj.data_length - 1
-                errors(i)=norm(obj.referenceStates(i).q - ...
-                    obj.nominalStates(i).attitude.q);
-            end
-            figure('Name','IMU Error State Kalman Filter For Attitude Estimation')
-            plot(errors)
+         function plotEulerAngleErrors(obj)
+             eulerAngles = zeros(3,obj.data_length - 1);
+             eulerAngleErrors = zeros(3,obj.data_length - 1);
+             for i = 1:obj.data_length-1
+                 eulerAngles(:,i)=obj.nominalStates(i).attitude.toEulerAngles();
+                 eulerAngleErrors(:,i)=eulerAngles(:,i)-obj.referenceStates(i,:).';
+             end             
+             figure('Name','IMU Error State Kalman Filter For Attitude Estimation')
+             subplot(2,3,1)
+             plot(eulerAngles(1,:))
+             hold on
+             plot(obj.referenceStates(:,1))
+             title('Roll')
+             subplot(2,3,2)
+             plot(eulerAngles(2,:))
+             hold on
+             plot(obj.referenceStates(:,2))
+             title('Pitch')
+             subplot(2,3,3)
+             plot(eulerAngles(3,:))
+             hold on
+             plot(obj.referenceStates(:,3))
+             title('Yaw')  
+             subplot(2,3,4)
+             plot(eulerAngleErrors(1,:))
+             subplot(2,3,5)
+             plot(eulerAngleErrors(2,:))
+             subplot(2,3,6)
+             plot(eulerAngleErrors(3,:))
         end
+%         function plotNormErrors(obj)
+%             errors = zeros(obj.data_length - 1);
+%             for i = 1:10:obj.data_length - 1
+%                 errors(i)=norm(obj.referenceStates(i).q - ...
+%                     obj.nominalStates(i).attitude.q);
+%             end
+%             figure('Name','IMU Error State Kalman Filter For Attitude Estimation')
+%             plot(errors)
+%         end
          %% Helper Functions
     
         function eulerAngles = measurement2EulerAngles(obj,measurement)

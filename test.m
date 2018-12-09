@@ -16,5 +16,5 @@ noise = NoiseParameter(gyroVar,gyroBias,gyroBiasVar,gyroBiasVarInit,...
 
 filter = IMU_ErrorStateKalmanFilter('NAV_1_p.mat',noise);
 %% 
-filter.plotNormErrors();
+filter.plotEulerAngleErrors();
 

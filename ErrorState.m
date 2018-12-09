@@ -36,19 +36,20 @@ classdef ErrorState
         end
         function obj = set.P(obj,value)
             if(ismatrix(value) && size(value,1) == 6 && size(value,2) == 6)
-                matrixPSD = value;
-                for r = 1:size(matrixPSD,1)
-                    for c = 1:size(matrixPSD,2)
-                        if r == c
-                            matrixPSD(r,c) = abs(matrixPSD(r,c));
-                        else
-                            offDiagElement = mean([matrixPSD(r,c),matrixPSD(c,r)]);
-                            matrixPSD(c,r) = offDiagElement;
-                            matrixPSD(r,c) = offDiagElement;
-                        end
-                    end
-                end
-                obj.P = matrixPSD;
+%                 matrixPSD = value;
+%                 for r = 1:size(matrixPSD,1)
+%                     for c = 1:size(matrixPSD,2)
+%                         if r == c
+%                             matrixPSD(r,c) = abs(matrixPSD(r,c));
+%                         else
+%                             offDiagElement = mean([matrixPSD(r,c),matrixPSD(c,r)]);
+%                             matrixPSD(c,r) = offDiagElement;
+%                             matrixPSD(r,c) = offDiagElement;
+%                         end
+%                     end
+%                 end
+%                 obj.P = matrixPSD;
+                obj.P = value;
             else
                 error('delta_omega_b of the Nominal State Must be a [6x6] Symmertic Matrix')
             end
