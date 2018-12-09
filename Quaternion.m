@@ -14,10 +14,17 @@ classdef Quaternion
             if nargin == 0
                 obj.q = [0;0;0;0];
             elseif nargin == 1 && isvector(varargin{1}) && size(varargin{1},1)==4
-                %build quaternion from a [4x1] Vector
+            %build quaternion from a [4x1] Vector
                 obj.q = varargin{1};
             elseif nargin == 1 && isa(varargin{1},'Quaternion')
                 obj = Quaternion(varargin{1}.q);
+            %Array Constructor
+            elseif nargin == 1 && isscalar(varargin{1})
+                obj(varargin{1},1)=obj;
+            %Build a Quaternion from the lie algebra so(3) ([3x1] Vector) J.S. Page 47
+            elseif nargin == 1 && isvector(varargin{1}) && size(varargin{1},1)==3
+                v = varargin{1};
+                obj = Quaternion([cos(norm(v)/2);v/norm(v)*sin(norm(v)/2)]);
             %Build a Quaternion from the rotation angles and rotation axis.    
             elseif nargin == 2 && isvector(varargin{2}) && size(varargin{2},1)==3 ...
                     && isscalar(varargin{1})
@@ -25,16 +32,12 @@ classdef Quaternion
                     error ('Quaternion Constructor Error, Rotation Axis Norm Not Equal to 1')
                 end
                 obj = Quaternion([cos(varargin{1}/2);sin(varargin{1}/2)*varargin{2}]);
-            %Build a Quaternion from the lie algebra so(3) ([3x1] Vector) Jose Page 47
-            elseif nargin == 1 && isvector(varargin{1}) && size(varargin{1},1)==3
-                v = varargin{1};
-                obj = Quaternion([cos(norm(v)/2);v/norm(v)*sin(norm(v)/2)]);
+            %build quaternion from XYZ Euler Angles
             elseif nargin == 2 && isvector(varargin{1}) && size(varargin{1},1)==3 && strcmp(varargin{2},'euler2Quaternion')
-                %build quaternion from XYZ Euler Angles
                 qx = Quaternion(varargin{1}(1),[1;0;0]);
                 qy = Quaternion(varargin{1}(2),[0;1;0]);
                 qz = Quaternion(varargin{1}(3),[0;0;1]);
-                obj = qz*(qy*qx);
+                obj = normalize(qz*(qy*qx));
             else
                 error ('invalid argument for Quaternion constructor')
             end

@@ -9,14 +9,15 @@ classdef IMU_ErrorStateKalmanFilter < handle
         measurements
         
         currentState
-        ReferenceStates    
+        referenceStates    
     end
     methods
         %% Constructor & Main Loop
  
         function obj = IMU_ErrorStateKalmanFilter(dataName,noiseParameters)
-            readInput(obj,dataName);
             obj.noiseParam = noiseParameters;
+            readInput(obj,dataName);
+            
             initializeStates(obj);
             %MAIN LOOP
             %Nominal State Prediction
@@ -41,14 +42,18 @@ classdef IMU_ErrorStateKalmanFilter < handle
             obj.nominalStates = NominalState(obj.data_length);
             obj.errorStates   = ErrorState(obj.data_length);
             obj.measurements  = Measurement(obj.data_length);
+            obj.referenceStates = Quaternion(obj.data_length);
             %build measurements with inputdata
             for i = 1:obj.data_length
                 obj.measurements(i).acc = data(i,9:11).';
                 obj.measurements(i).av  = data(i,27:29).'; 
                 obj.measurements(i).mag = data(i,15:17).';
+                obj.referenceStates(i) = Quaternion(data(i,30:32).','euler2Quaternion');
                 %NOTICE THIS IS HARD-CODE NOW, BUT WILL UPDATE LATER
                 obj.measurements(i).dt = 0.02;
             end
+            %Ref
+            
             %set current state to be one
             obj.currentState = 1;
         end  
@@ -105,7 +110,7 @@ classdef IMU_ErrorStateKalmanFilter < handle
         %% Error State Prediction
          function errorStatePrediction(obj) 
             % The Prediction of delta_theta
-            % Jose, Page58
+            % J.S., Page58
             % First compute (w_m-w_b)*delta_t
             % Then make it to a rotation matrix using matrix exponential
             % map.
@@ -140,61 +145,98 @@ classdef IMU_ErrorStateKalmanFilter < handle
           %% Error State Correction
 
          function errorStateCorrection(obj)
-             %Calculate H and detZ = y-h(det_x)
-             [H,detZ] = calH(obj,obj.nominalStates(obj.currentState+1).attitude.q,  obj.measurements(obj.currentState+1));
+             %First we compute the H due to the gravity field of the earth
+             q_vector     = obj.nominalStates(obj.currentState+1).attitude.q;
+             q_quat = obj.nominalStates(obj.currentState+1).attitude;
+             %Notice that if you want to fit this program with your data,
+             %your IMU must measure the gravity as [0;0;+g] when heading up.
+             %Assume the gravity field on the earth is [0;0;g] everywhere.
+             
+             d_gravity = [0;0;1];
+             d_magnet  = [26790.5;-4245.4;46873.2];
+             d_magnet = d_magnet/norm(d_magnet);
+             
+             %NOTICE THAT THIS MAGNET FIELD IS HARD-CODE HERE
+             %FIND YOUR MAGFIELD VECTOR HERE: https://www.ngdc.noaa.gov/geomag/calculators/
+             Ha = computeJacobian(obj,q_vector,d_gravity);
+             Hm = computeJacobian(obj,q_vector,d_magnet);
+             %These zeros are due to the bias of the angular velocity
+             %cannot be measured. Therefore, in the h(x) function, there is
+             %no terms having relationship with omega_b. Thus, H(:,4:6) are
+             %all zeros
+             H_delta_x = [Ha zeros(3,3);
+                  Hm zeros(3,3)];
+   
+             %Next we have to compute X_delta_x
+             %First we compute Q_delta_theta
+             %J.S. Page 62
+             %Q_delta_theta = (1/2)*q_quat.leftProductMatrix()*[0 0 0;ones(3)];
+             %Or you can compute the Q_delta_theta explicitly and copy it
+             %here
+             Q_delta_theta  = 0.5*[-q_vector(2),    -q_vector(3),     -q_vector(4)
+                                    q_vector(1),    -q_vector(4),      q_vector(3) 
+                                    q_vector(4),    q_vector(1),      -q_vector(2) 
+                                   -q_vector(3),    q_vector(2),       q_vector(1)];
+             
+             X_delta_x =  [Q_delta_theta , zeros(4,3)
+                           zeros(3)       , eye(3)];
+                       
+             %After all the preparation above, we can compute H now.
+             H = H_delta_x*X_delta_x;
+             
+             %Then we compute the gain matrix 'K'
+             %J.S. Page 61
              P = obj.errorStates(obj.currentState+1).P;
-             % Calculate Kalman gain
-             K = (P*H') / ( H*P*H' + obj.noiseParam.V); 
-             % State correction
-             delta_x =  K * detZ;
-             obj.errorStates(obj.currentState+1).delta_theta = delta_x(1:3);
-             obj.errorStates(obj.currentState+1).delta_omega_b = delta_x(4:6);
-             % Covariance correction
-             obj.errorStates(obj.currentState+1).P = P -  K *(H*P*H'+ obj.noiseParam.V)*K';
+             V = obj.noiseParam.V;
+             K = P*H.'/(H*P*H+V);
+
+             %Next we compute h(x)
+             %h(x) is computed by the following method
+             %First we use the conjugation property of quaternions to make
+             %the vector describe in the earth frame to be described in the
+             %IMU's Frame
+             
+             hx_gravity = h(obj,q_quat,Quaternion([0;d_gravity]));
+             hx_magnet  = h(obj,q_quat,Quaternion([0;d_magnet]));
+             %Then we combine them together to be a [6x1] vector and
+             %compute delta_x_hat = K( y - h ( x_hat ) )
+             hx = [hx_gravity;hx_magnet];
+             
+             y = [obj.measurements(obj.currentState+1).acc;...
+                  obj.measurements(obj.currentState+1).mag ];
+             delta_x_hat = K*(y-hx);
+             %Then we make the correction of error state
+             obj.errorStates(obj.currentState+1).delta_theta   = delta_x_hat(1:3,1);
+             obj.errorStates(obj.currentState+1).delta_omega_b = delta_x_hat(4:6,1);
+             %Finally we can update the covariance
+             obj.errorStates(obj.currentState+1).P = P - K * (H * P * H'+ V) * K.';
          end
          %Calculate Measurement Jacobian
-         %Error Need to be Checked
-         function [H,detZ] = calH(obj,q,measurements)
-             % Normalise magnetometer measurement
-             if(norm(measurements.mag) == 0), return; end	% 
-             measurements.mag = measurements.mag / norm(measurements.mag);	% normalise magnitude,very important!!!!
-             % Normalise accelerometer measurement
-             if(norm(measurements.acc) == 0), return; end	% handle NaN
-             measurements.acc  = measurements.acc / norm(measurements.acc);	% normalise accelerometer ,very important!!!!
-             % Reference direction of Earth's magnetic feild
-             h = quaternProd(q, quaternProd([0; measurements.mag], quatInv(q)));
-             b = [0 norm([h(2) h(3)]) 0 h(4)];
+         %Error Need to be Checked        
+         function jacobian = computeJacobian(obj,q,d)
+             dx = d(1);
+             dy = d(2);
+             dz = d(3);
+             q1 = q(1);
+             q2 = q(2);
+             q3 = q(3);
+             q4 = q(4);
              
-             Ha = [2*q(3),                 	-2*q(4),                    2*q(1),                         -2*q(2)
-                 -2*q(2),                 	-2*q(1),                   -2*q(4),                         -2*q(3)
-                 0,                         4*q(2),                    4*q(3),                         0];
-             
-             Hm = [-2*b(4)*q(3),                2*b(4)*q(4),               -4*b(2)*q(3)-2*b(4)*q(1),       -4*b(2)*q(4)+2*b(4)*q(2)
-                 -2*b(2)*q(4)+2*b(4)*q(2),	   2*b(2)*q(3)+2*b(4)*q(1),    2*b(2)*q(2)+2*b(4)*q(4),       -2*b(2)*q(1)+2*b(4)*q(3)
-                 2*b(2)*q(3),                2*b(2)*q(4)-4*b(4)*q(2),	   2*b(2)*q(1)-4*b(4)*q(3),        2*b(2)*q(2)];       
-             
-             Hx = [Ha, zeros(3,3)
-                 Hm, zeros(3,3)];
-             %Hx = [Ha, zeros(3,3)];
-             Q_detTheta  = [-q(2),    -q(3),      -q(4)
-                 q(1),    -q(4),       q(3) 
-                 q(4),     q(1),      -q(2) 
-                 -q(3),     q(2),       q(1)];
-      
-             Xx = [0.5*Q_detTheta , zeros(4,3)
-                 zeros(3)       , eye(3)];
-      
-             H = Hx*Xx; 
-      
-             detZ_a = [ 2*(q(2)*q(4)  - q(1)*q(3)) + measurements.acc(1)
-                 2*(q(1)*q(2) + q(3)*q(4)) + measurements.acc(2)
-                 2*(0.5 - q(2)^2 - q(3)^2) + measurements.acc(3)];
-             detZ_m =[((2*b(2)*(0.5 - q(3)^2 - q(4)^2) + 2*b(4)*(q(2)*q(4) - q(1)*q(3))) + measurements.mag(1))
-                 ((2*b(2)*(q(2)*q(3) - q(1)*q(4)) + 2*b(4)*(q(1)*q(2) + q(3)*q(4))) + measurements.mag(2))
-                 ((2*b(2)*(q(1)*q(3) + q(2)*q(4)) + 2*b(4)*(0.5 - q(2)^2 - q(3)^2)) + measurements.mag(3))]; 
-      
-             detZ   = [detZ_a;detZ_m];
+             jacobian = [2*dy*q4-2*dz*q3 2*dy*q3+2*dz*q4         -4*dx*q3+2*dy*q2-2*dz*q1 -4*dx*q4+2*dy*q1+2*dz*q2;
+                        -2*dx*q4+2*dz*q2 2*dx*q3-4*dy*q2+2*dz*q1 2*dx*q2+2*dz*q4          -2*dx*q1-4*dy*q4+2*dz*q3;
+                        2*dx*q3-2*dy*q2  2*dx*q4-2*dy*q1-4*dz*q2 2*dx*q1+2*dy*q4-4*dz*q3  2*dx*q2+2*dy*q3          ];
          end
+         
+         function h = h(obj,q,d)
+             %q and d are all quaternions
+             %we first compute the pure quaternion(quaternions only have 
+             %the vector part) h_quaternion
+             h_quaternion = q'*d*q;
+             %Then we return its vector part
+             h = h_quaternion.q;
+             h = h(2:4);
+         end
+         
          %% Inject Error into nominal State
          function injectErrorToNominal(obj)
          % inject the attitude error
@@ -212,34 +254,49 @@ classdef IMU_ErrorStateKalmanFilter < handle
              obj.errorStates(obj.currentState+1).delta_omega_b = [0;0;0];
             %obj.errorStates(obj.currentState+1).P = obj.errorStates(obj.currentState+1).P
          end
-         %% Plot figure
-         function plot(obj)
-             eulerAngles = zeros(3,obj.data_length - 1);
-             for i = 1:obj.data_length-1
-                 eulerAngles(:,i)=obj.nominalStates(i).attitude.toEulerAngles();
-             end             
-             figure('Name','IMU Error State Kalman Filter For Attitude Estimation')
-             subplot(1,3,1)
-             plot(eulerAngles(1,:))
-             title('Roll')
-             subplot(1,3,2)
-             plot(eulerAngles(2,:))
-             title('Pitch')
-             subplot(1,3,3)
-             plot(eulerAngles(3,:))
-             title('Yaw')    
-         end
+         % Plot figure
+%          function plotEulerAngleErrors(obj)
+%              eulerAngles = zeros(3,obj.data_length - 1);
+%              for i = 1:obj.data_length-1
+%                  eulerAngles(:,i)=obj.nominalStates(i).attitude.toEulerAngles();
+%              end             
+%              figure('Name','IMU Error State Kalman Filter For Attitude Estimation')
+%              subplot(1,3,1)
+%              plot(eulerAngles(1,:))
+%              hold on
+%              plot(obj.referenceStates(:,1))
+%              title('Roll')
+%              subplot(1,3,2)
+%              plot(eulerAngles(2,:))
+%              hold on
+%              plot(obj.referenceStates(:,2))
+%              title('Pitch')
+%              subplot(1,3,3)
+%              plot(eulerAngles(3,:))
+%              hold on
+%              plot(obj.referenceStates(:,3))
+%              title('Yaw')    
+%          end
+        function plotNormErrors(obj)
+            errors = zeros(obj.data_length - 1);
+            for i = 1:obj.data_length - 1
+                errors(i)=norm(obj.referenceStates(i).q - ...
+                    obj.nominalStates(i).attitude.q);
+            end
+            figure('Name','IMU Error State Kalman Filter For Attitude Estimation')
+            plot(errors)
+        end
          %% Helper Functions
     
         function eulerAngles = measurement2EulerAngles(obj,measurement)
         eulerAngles = zeros(3,1);
-        eulerAngles(1) = atan2(-measurement.acc(2),-measurement.acc(3));
-        eulerAngles(2) = asin(measurement.acc(1));
+        eulerAngles(1) = atan2(measurement.acc(2),measurement.acc(3));
+        eulerAngles(2) = -asin(measurement.acc(1));
         eulerAngles(3) = atan2(-measurement.mag(2)*cos(eulerAngles(1))+...
             measurement.mag(3)*sin(eulerAngles(1)),...
             measurement.mag(1)*cos(eulerAngles(2))+...
             measurement.mag(2)*sin(eulerAngles(2))*sin(eulerAngles(1))+...
-            measurement.mag(3)*sin(eulerAngles(2))*cos(eulerAngles(1)))-obj.noiseParam.mag_declination*pi/180;       
+            measurement.mag(3)*sin(eulerAngles(2))*cos(eulerAngles(1)))-obj.noiseParam.mag_declination/180*pi;       
         end
     
         function quaternion = measurement2Quaternion(obj,measurement)

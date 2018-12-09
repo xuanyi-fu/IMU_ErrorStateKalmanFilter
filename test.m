@@ -14,6 +14,7 @@ magDec = 8.3;
 noise = NoiseParameter(gyroVar,gyroBias,gyroBiasVar,gyroBiasVarInit,...
                 accVar,MagVar,attVarInit,magDec);
 
-filter = IMU_ErrorStateKalmanFilter('NAV_1.mat',noise);
-filter.plot();
+filter = IMU_ErrorStateKalmanFilter('NAV_1_p.mat',noise);
+%% 
+filter.plotNormErrors();
 
